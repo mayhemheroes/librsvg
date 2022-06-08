@@ -1,0 +1,27 @@
+[package]
+name = "librsvg-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+glib = "0.15"
+gio = { version="0.15", features=["v2_50"] }
+
+[dependencies.librsvg]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "svg_loader"
+path = "fuzz_targets/svg_loader.rs"
+test = false
+doc = false
