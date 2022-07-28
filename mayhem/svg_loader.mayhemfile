@@ -1,0 +1,7 @@
+project: librsvg
+target: svg-loader
+
+cmds:
+  - cmd: /svg_loader
+  - cmd: /svg_loader_no_inst @@
+    libfuzzer: false
