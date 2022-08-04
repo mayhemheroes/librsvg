@@ -10,8 +10,8 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-glib = "0.15"
-gio = { version="0.15", features=["v2_50"] }
+glib = { version = "0.15.12", features = ["v2_50"] }
+gio = { version = "0.15.12", features = ["v2_50"] }
 
 [dependencies.librsvg]
 path = ".."
