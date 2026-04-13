@@ -30,7 +30,7 @@ RUN mkdir /testsuite && find /src -name '*.svg' -exec cp {} /testsuite/ \;
 FROM ubuntu:24.04
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 \
+    libcairo2 libcairo-gobject2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 \
     libxml2 libglib2.0-0 libfontconfig1
 
 COPY --from=builder /render_document /render_document_no_inst /
