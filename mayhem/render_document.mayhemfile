@@ -1,0 +1,7 @@
+project: librsvg
+target: render-document
+
+cmds:
+  - cmd: /render_document
+  - cmd: /render_document_no_inst @@
+    libfuzzer: false
