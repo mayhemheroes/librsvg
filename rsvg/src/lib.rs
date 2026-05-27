@@ -131,10 +131,27 @@
 //!    filenames, by removing "`..`" path components and resolving symbolic
 //!    links, to decide whether files meet these conditions.
 //!
+//! # Crate features
+//!
+//! * **avif** -
+//!   Causes the [`image`] crate, which librsvg uses to load raster images, to compile in
+//!   support for decoding AV1 images.  This feature is optional since it requires the
+//!   presence of the system's [libdav1d].
+//!
+//! * **capi** -
+//!   Internal feature, used by `librsvg-c` to build the C API.  Rust applications do not
+//!   need to use this.
+//!
+//! * **test-utils** -
+//!   Internal feature, used by the test suite.  Rust applications do not need to use
+//!   this.
+//!
 //! [static mode]: https://www.w3.org/TR/SVG2/conform.html#static-mode
 //! [secure static mode]: https://www.w3.org/TR/SVG2/conform.html#secure-static-mode
 //! [SVG 1.1]: https://www.w3.org/TR/SVG11/
 //! [SVG 2]: https://www.w3.org/TR/SVG2/
+//! [`image`]: https://crates.io/crates/image
+//! [libdav1d]: https://www.videolan.org/projects/dav1d.html
 
 #![doc(html_logo_url = "https://gnome.pages.gitlab.gnome.org/librsvg/Rsvg-2.0/librsvg-r.svg")]
 #![allow(rustdoc::private_intra_doc_links)]
