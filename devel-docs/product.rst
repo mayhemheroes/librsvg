@@ -19,7 +19,7 @@ can be used from C and other languages:
 
 - A shared library ``librsvg-2.so`` (the file extension will be
   different on MacOS or Windows).  This is usually installed as part
-  of the system's libraries.  For example, the GTK toolkit assumes
+  of the system's libraries.  For example, Gnome Shell assumes
   that librsvg's library is installed in the system, and uses it to
   load SVG assets like icons.  Applications can generally link to this
   library and load SVG documents for different purposes.

@@ -10,7 +10,7 @@ use std::fmt;
 pub use crate::{
     accept_language::{AcceptLanguage, Language},
     drawing_ctx::Viewport,
-    error::{DefsLookupErrorKind, ImplementationLimit, LoadingError},
+    error::{ImplementationLimit, LoadingError},
     length::{LengthUnit, RsvgLength as Length},
 };
 
