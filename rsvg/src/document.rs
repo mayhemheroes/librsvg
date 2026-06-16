@@ -22,7 +22,9 @@ use crate::dpi::Dpi;
 use crate::drawing_ctx::{
     DrawingMode, RenderingConfiguration, SvgNesting, draw_tree, with_saved_cr,
 };
-use crate::error::{AcquireError, InternalRenderingError, LoadingError, NodeIdError};
+use crate::error::{
+    AcquireError, InternalRenderingError, LoadingDepthError, LoadingError, NodeIdError,
+};
 use crate::io::{self, BinaryData};
 use crate::is_element_of_type;
 use crate::limits;
@@ -197,16 +199,32 @@ impl Document {
     pub fn load_from_stream(
         session: Session,
         load_options: Arc<LoadOptions>,
+        load_limiter: LoadingDepthLimiter,
         stream: &gio::InputStream,
         cancellable: Option<&gio::Cancellable>,
     ) -> Result<Document, LoadingError> {
-        xml_load_from_possibly_compressed_stream(
+        // We try to increment the load_limiter to indicate that a new SVG file is being loaded,
+        // possibly in the context of another one that references it.
+        //
+        // The child document takes a clone of this load_limiter at its current value (via
+        // DocumentBuilder::new() below), and also the XML loader takes a clone so that it
+        // can monitor the depth of XInclude invocations.  The child document will then
+        // know that it is at a greater depth than the current one, and so on for
+        // grandchild documents.
+        load_limiter.increment()?;
+
+        let res = xml_load_from_possibly_compressed_stream(
             session.clone(),
-            DocumentBuilder::new(session, load_options.clone()),
+            DocumentBuilder::new(session, load_options.clone(), load_limiter.clone()),
             load_options,
+            load_limiter.clone(),
             stream,
             cancellable,
-        )
+        );
+
+        load_limiter.decrement();
+
+        res
     }
 
     /// Utility function to load a document from a static string in tests.
@@ -220,6 +238,7 @@ impl Document {
         let document = Document::load_from_stream(
             session.clone(),
             Arc::new(LoadOptions::new(UrlResolver::new(None))),
+            LoadingDepthLimiter::new(),
             &stream.upcast(),
             None::<&gio::Cancellable>,
         )
@@ -503,6 +522,48 @@ impl Document {
     }
 }
 
+/// Tracks the number of nested file loads within a document
+///
+/// While loading or rendering a document, various operations may
+/// cause extra files to be read.  For example, XML includes, or
+/// `<image src="foo.svg">`, or loading a CSS stylesheet, or CSS
+/// includes.  Librsvg places a limit on the nesting depth, to catch
+/// recursively referenced files.  See the description for
+/// [`limits::MAX_FILE_LOADING_DEPTH`].
+#[derive(Clone)]
+pub struct LoadingDepthLimiter(Cell<usize>);
+
+impl LoadingDepthLimiter {
+    /// Creates a `LoadingDepthLimiter` with a starting depth of 0.
+    pub fn new() -> Self {
+        Self(Cell::new(0))
+    }
+
+    /// Increments the depth of loaded files.
+    ///
+    /// Returns an error if the limit is exceeded; in this case the caller should
+    /// terminate the loading process with an error as quickly as possible.
+    pub fn increment(&self) -> Result<(), LoadingDepthError> {
+        let depth = self.0.get();
+        if depth == limits::MAX_FILE_LOADING_DEPTH {
+            Err(LoadingDepthError)
+        } else {
+            self.0.set(depth + 1);
+            Ok(())
+        }
+    }
+
+    /// Decrements the depth of loaded files.
+    pub fn decrement(&self) {
+        let depth = self.0.get();
+        if depth == 0 {
+            panic!("too many decrements in LoadingDepthLimiter");
+        } else {
+            self.0.set(depth - 1);
+        }
+    }
+}
+
 fn unit_rectangle() -> Rect {
     Rect::from_size(1.0, 1.0)
 }
@@ -520,12 +581,14 @@ pub enum Resource {
 /// and stored here, referenced by its URL.
 struct Resources {
     resources: HashMap<AllowedUrl, Result<Resource, LoadingError>>,
+    load_limiter: LoadingDepthLimiter,
 }
 
 impl Resources {
-    fn new() -> Resources {
+    fn new(load_limiter: LoadingDepthLimiter) -> Resources {
         Resources {
             resources: Default::default(),
+            load_limiter,
         }
     }
 
@@ -588,7 +651,13 @@ impl Resources {
             Entry::Occupied(e) => e.get().clone(),
 
             Entry::Vacant(e) => {
-                let resource_result = load_resource(session, load_options, aurl, cancellable);
+                let resource_result = load_resource(
+                    session,
+                    load_options,
+                    self.load_limiter.clone(),
+                    aurl,
+                    cancellable,
+                );
                 e.insert(resource_result.clone());
                 resource_result
             }
@@ -669,6 +738,7 @@ impl ResourceType {
 fn load_resource(
     session: &Session,
     load_options: &LoadOptions,
+    load_limiter: LoadingDepthLimiter,
     aurl: &AllowedUrl,
     cancellable: Option<&gio::Cancellable>,
 ) -> Result<Resource, LoadingError> {
@@ -689,7 +759,14 @@ fn load_resource(
                 let format = resource_type.to_image_format();
                 load_image_resource_from_bytes(load_options, aurl, bytes, format)
             }
-            Svg => load_svg_resource_from_bytes(session, load_options, aurl, bytes, cancellable),
+            Svg => load_svg_resource_from_bytes(
+                session,
+                load_options,
+                load_limiter,
+                aurl,
+                bytes,
+                cancellable,
+            ),
             _ => unreachable!(),
         }
     } else {
@@ -699,7 +776,14 @@ fn load_resource(
         if let Ok(format) = image::guess_format(&bytes) {
             load_image_resource_from_bytes(load_options, aurl, bytes, format)
         } else {
-            load_svg_resource_from_bytes(session, load_options, aurl, bytes, cancellable)
+            load_svg_resource_from_bytes(
+                session,
+                load_options,
+                load_limiter,
+                aurl,
+                bytes,
+                cancellable,
+            )
         }
     }
 }
@@ -708,6 +792,7 @@ fn load_resource(
 fn load_svg_resource_from_bytes(
     session: &Session,
     load_options: &LoadOptions,
+    load_limiter: LoadingDepthLimiter,
     aurl: &AllowedUrl,
     input_bytes: Vec<u8>,
     cancellable: Option<&gio::Cancellable>,
@@ -718,6 +803,7 @@ fn load_svg_resource_from_bytes(
     let document = Document::load_from_stream(
         session.clone(),
         Arc::new(load_options.copy_with_base_url(aurl)),
+        load_limiter,
         &stream.upcast(),
         cancellable,
     )?;
@@ -1054,6 +1140,9 @@ pub struct DocumentBuilder {
     /// Loading options; mainly the URL resolver.
     load_options: Arc<LoadOptions>,
 
+    /// To limit the depth of referenced files
+    load_limiter: LoadingDepthLimiter,
+
     /// Root node of the tree.
     tree: Option<Node>,
 
@@ -1065,10 +1154,15 @@ pub struct DocumentBuilder {
 }
 
 impl DocumentBuilder {
-    pub fn new(session: Session, load_options: Arc<LoadOptions>) -> DocumentBuilder {
+    pub fn new(
+        session: Session,
+        load_options: Arc<LoadOptions>,
+        load_limiter: LoadingDepthLimiter,
+    ) -> DocumentBuilder {
         DocumentBuilder {
             session,
             load_options,
+            load_limiter,
             tree: None,
             ids: HashMap::new(),
             stylesheets: Vec::new(),
@@ -1141,6 +1235,7 @@ impl DocumentBuilder {
     pub fn build(self) -> Result<Document, LoadingError> {
         let DocumentBuilder {
             load_options,
+            load_limiter,
             session,
             tree,
             ids,
@@ -1155,7 +1250,7 @@ impl DocumentBuilder {
                         tree: RefCell::new(root),
                         session: session.clone(),
                         ids,
-                        resources: RefCell::new(Resources::new()),
+                        resources: RefCell::new(Resources::new(load_limiter)),
                         load_options,
                         stylesheets,
                         needs_cascade: Cell::new(true),

@@ -7,7 +7,7 @@ use gio::{
 };
 use glib::object::Cast;
 use markup5ever::{ExpandedName, LocalName, Namespace, QualName, expanded_name, local_name, ns};
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str;
@@ -22,10 +22,10 @@ use xml5ever::{
 
 use crate::borrow_element_as;
 use crate::css::{Origin, Stylesheet};
-use crate::document::{Document, DocumentBuilder, LoadOptions};
-use crate::error::{ImplementationLimit, LoadingError};
+use crate::document::{Document, DocumentBuilder, LoadOptions, LoadingDepthLimiter};
+use crate::error::{ImplementationLimit, LoadingDepthError, LoadingError};
 use crate::io::{self, IoError};
-use crate::limits::{MAX_LOADED_ELEMENTS, MAX_FILE_LOADING_DEPTH};
+use crate::limits::MAX_LOADED_ELEMENTS;
 use crate::node::{Node, NodeBorrow};
 use crate::rsvg_log;
 use crate::session::Session;
@@ -124,7 +124,7 @@ macro_rules! xinclude_name {
 struct XmlStateInner {
     document_builder: DocumentBuilder,
     num_loaded_elements: usize,
-    xinclude_depth: Rc<Cell<usize>>,
+    load_limiter: LoadingDepthLimiter,
     context_stack: Vec<Context>,
     current_node: Option<Node>,
 
@@ -169,12 +169,13 @@ impl XmlState {
         session: Session,
         document_builder: DocumentBuilder,
         load_options: Arc<LoadOptions>,
+        load_limiter: LoadingDepthLimiter,
     ) -> XmlState {
         XmlState {
             inner: RefCell::new(XmlStateInner {
                 document_builder,
                 num_loaded_elements: 0,
-                xinclude_depth: Rc::new(Cell::new(0)),
+                load_limiter,
                 context_stack: vec![Context::Start],
                 current_node: None,
                 entities: HashMap::new(),
@@ -580,22 +581,16 @@ impl XmlState {
     fn increase_xinclude_depth(&self, aurl: &AllowedUrl) -> Result<(), AcquireError> {
         let inner = self.inner.borrow();
 
-        let xinclude_depth = inner.xinclude_depth.get();
-
-        if xinclude_depth == MAX_FILE_LOADING_DEPTH {
-            Err(AcquireError::FatalError(format!(
-                "exceeded maximum level of nested xinclude in {aurl}"
-            )))
-        } else {
-            inner.xinclude_depth.set(xinclude_depth + 1);
-            Ok(())
-        }
+        inner.load_limiter.increment().map_err(|e| match e {
+            LoadingDepthError => AcquireError::FatalError(format!(
+                "xinclude exceeded the maximum level of file nesting in {aurl}"
+            )),
+        })
     }
 
     fn decrease_xinclude_depth(&self) {
         let inner = self.inner.borrow();
-        let xinclude_depth = inner.xinclude_depth.get();
-        inner.xinclude_depth.set(xinclude_depth - 1);
+        inner.load_limiter.decrement();
     }
 
     fn acquire_text(&self, aurl: &AllowedUrl, encoding: Option<&str>) -> Result<(), AcquireError> {
@@ -754,10 +749,11 @@ pub fn xml_load_from_possibly_compressed_stream(
     session: Session,
     document_builder: DocumentBuilder,
     load_options: Arc<LoadOptions>,
+    load_limiter: LoadingDepthLimiter,
     stream: &gio::InputStream,
     cancellable: Option<&gio::Cancellable>,
 ) -> Result<Document, LoadingError> {
-    let state = XmlState::new(session, document_builder, load_options);
+    let state = XmlState::new(session, document_builder, load_options, load_limiter);
 
     let stream = get_input_stream_for_loading(stream, cancellable)?;
 
