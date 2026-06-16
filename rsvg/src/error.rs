@@ -262,6 +262,12 @@ impl fmt::Display for AcquireError {
     }
 }
 
+/// Error returned when the depth of loaded files exceeds a limit.
+///
+/// This is returned when [`crate::document::LoadingDepthLimiter`] detects that the
+/// maximum depth of recursively loaded files exceeds [`limits::MAX_FILE_LOADING_DEPTH`].
+pub struct LoadingDepthError;
+
 /// Helper for converting `Result<O, E>` into `Result<O, ElementError>`
 ///
 /// A `ElementError` requires a `QualName` that corresponds to the attribute to which the
