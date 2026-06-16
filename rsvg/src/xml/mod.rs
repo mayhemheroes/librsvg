@@ -25,7 +25,7 @@ use crate::css::{Origin, Stylesheet};
 use crate::document::{Document, DocumentBuilder, LoadOptions};
 use crate::error::{ImplementationLimit, LoadingError};
 use crate::io::{self, IoError};
-use crate::limits::{MAX_LOADED_ELEMENTS, MAX_XINCLUDE_DEPTH};
+use crate::limits::{MAX_LOADED_ELEMENTS, MAX_FILE_LOADING_DEPTH};
 use crate::node::{Node, NodeBorrow};
 use crate::rsvg_log;
 use crate::session::Session;
@@ -582,7 +582,7 @@ impl XmlState {
 
         let xinclude_depth = inner.xinclude_depth.get();
 
-        if xinclude_depth == MAX_XINCLUDE_DEPTH {
+        if xinclude_depth == MAX_FILE_LOADING_DEPTH {
             Err(AcquireError::FatalError(format!(
                 "exceeded maximum level of nested xinclude in {aurl}"
             )))
