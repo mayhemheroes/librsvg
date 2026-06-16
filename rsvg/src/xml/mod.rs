@@ -7,7 +7,7 @@ use gio::{
 };
 use glib::object::Cast;
 use markup5ever::{ExpandedName, LocalName, Namespace, QualName, expanded_name, local_name, ns};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str;
@@ -124,7 +124,7 @@ macro_rules! xinclude_name {
 struct XmlStateInner {
     document_builder: DocumentBuilder,
     num_loaded_elements: usize,
-    xinclude_depth: usize,
+    xinclude_depth: Rc<Cell<usize>>,
     context_stack: Vec<Context>,
     current_node: Option<Node>,
 
@@ -174,7 +174,7 @@ impl XmlState {
             inner: RefCell::new(XmlStateInner {
                 document_builder,
                 num_loaded_elements: 0,
-                xinclude_depth: 0,
+                xinclude_depth: Rc::new(Cell::new(0)),
                 context_stack: vec![Context::Start],
                 current_node: None,
                 entities: HashMap::new(),
@@ -578,21 +578,24 @@ impl XmlState {
     }
 
     fn increase_xinclude_depth(&self, aurl: &AllowedUrl) -> Result<(), AcquireError> {
-        let mut inner = self.inner.borrow_mut();
+        let inner = self.inner.borrow();
 
-        if inner.xinclude_depth == MAX_XINCLUDE_DEPTH {
+        let xinclude_depth = inner.xinclude_depth.get();
+
+        if xinclude_depth == MAX_XINCLUDE_DEPTH {
             Err(AcquireError::FatalError(format!(
                 "exceeded maximum level of nested xinclude in {aurl}"
             )))
         } else {
-            inner.xinclude_depth += 1;
+            inner.xinclude_depth.set(xinclude_depth + 1);
             Ok(())
         }
     }
 
     fn decrease_xinclude_depth(&self) {
-        let mut inner = self.inner.borrow_mut();
-        inner.xinclude_depth -= 1;
+        let inner = self.inner.borrow();
+        let xinclude_depth = inner.xinclude_depth.get();
+        inner.xinclude_depth.set(xinclude_depth - 1);
     }
 
     fn acquire_text(&self, aurl: &AllowedUrl, encoding: Option<&str>) -> Result<(), AcquireError> {
