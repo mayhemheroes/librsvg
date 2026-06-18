@@ -95,6 +95,7 @@ use std::fmt;
 use std::str;
 use std::str::FromStr;
 
+use crate::document::LoadingDepthLimiter;
 use crate::element::Element;
 use crate::error::*;
 use crate::io;
@@ -897,10 +898,11 @@ impl Stylesheet {
         buf: &str,
         url_resolver: &UrlResolver,
         origin: Origin,
+        load_limiter: LoadingDepthLimiter,
         session: Session,
     ) -> Result<Self, LoadingError> {
         let mut stylesheet = Stylesheet::empty(origin);
-        stylesheet.add_rules_from_string(buf, url_resolver, session)?;
+        stylesheet.add_rules_from_string(buf, url_resolver, load_limiter, session)?;
         Ok(stylesheet)
     }
 
@@ -908,10 +910,11 @@ impl Stylesheet {
     pub fn from_href(
         aurl: &AllowedUrl,
         origin: Origin,
+        load_limiter: LoadingDepthLimiter,
         session: Session,
     ) -> Result<Self, LoadingError> {
         let mut stylesheet = Stylesheet::empty(origin);
-        stylesheet.load(aurl, session)?;
+        stylesheet.load(aurl, load_limiter, session)?;
         Ok(stylesheet)
     }
 
@@ -926,6 +929,7 @@ impl Stylesheet {
         &mut self,
         buf: &str,
         url_resolver: &UrlResolver,
+        load_limiter: LoadingDepthLimiter,
         session: Session,
     ) -> Result<(), LoadingError> {
         let mut input = ParserInput::new(buf);
@@ -946,7 +950,7 @@ impl Stylesheet {
                 Rule::AtRule(AtRule::Import(url)) => match url_resolver.resolve_href(&url) {
                     Ok(aurl) => {
                         // ignore invalid imports
-                        let _ = self.load(&aurl, session.clone());
+                        let _ = self.load(&aurl, load_limiter.clone(), session.clone());
                     }
 
                     Err(e) => {
@@ -961,8 +965,15 @@ impl Stylesheet {
     }
 
     /// Parses a stylesheet referenced by an URL
-    fn load(&mut self, aurl: &AllowedUrl, session: Session) -> Result<(), LoadingError> {
-        io::acquire_data(aurl, None)
+    fn load(
+        &mut self,
+        aurl: &AllowedUrl,
+        load_limiter: LoadingDepthLimiter,
+        session: Session,
+    ) -> Result<(), LoadingError> {
+        load_limiter.increment()?;
+
+        let res = io::acquire_data(aurl, None)
             .map_err(LoadingError::from)
             .and_then(|data| {
                 String::from_utf8(data.data).map_err(|_| {
@@ -976,8 +987,17 @@ impl Stylesheet {
             })
             .and_then(|utf8| {
                 let url = (**aurl).clone();
-                self.add_rules_from_string(&utf8, &UrlResolver::new(Some(url)), session)
-            })
+                self.add_rules_from_string(
+                    &utf8,
+                    &UrlResolver::new(Some(url)),
+                    load_limiter.clone(),
+                    session,
+                )
+            });
+
+        load_limiter.decrement();
+
+        res
     }
 
     /// Appends the style declarations that match a specified node to a given vector

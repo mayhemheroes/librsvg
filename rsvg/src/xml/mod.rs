@@ -316,9 +316,12 @@ impl XmlState {
 
             if let Some(href) = href {
                 if let Ok(aurl) = self.load_options.url_resolver.resolve_href(&href) {
-                    if let Ok(stylesheet) =
-                        Stylesheet::from_href(&aurl, Origin::Author, self.session.clone())
-                    {
+                    if let Ok(stylesheet) = Stylesheet::from_href(
+                        &aurl,
+                        Origin::Author,
+                        inner.load_limiter.clone(),
+                        self.session.clone(),
+                    ) {
                         inner.document_builder.append_stylesheet(stylesheet);
                     } else {
                         // FIXME: https://www.w3.org/TR/xml-stylesheet/ does not seem to specify
@@ -429,6 +432,7 @@ impl XmlState {
                 &stylesheet_text,
                 &self.load_options.url_resolver,
                 Origin::Author,
+                inner.load_limiter.clone(),
                 self.session.clone(),
             ) {
                 inner.document_builder.append_stylesheet(stylesheet);

@@ -359,6 +359,7 @@ impl SvgHandle {
             css,
             &UrlResolver::new(None),
             Origin::User,
+            LoadingDepthLimiter::new(),
             self.session.clone(),
         )?;
         self.document.cascade(&[stylesheet]);

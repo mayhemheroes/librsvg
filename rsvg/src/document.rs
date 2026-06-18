@@ -310,6 +310,7 @@ impl Document {
                         include_str!("ua.css"),
                         &UrlResolver::new(None),
                         Origin::UserAgent,
+                        self.resources.borrow().load_limiter.clone(),
                         Session::default(),
                     )
                     .expect("could not parse user agent stylesheet for librsvg, there's a bug!"),

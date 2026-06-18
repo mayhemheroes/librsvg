@@ -53,4 +53,5 @@ mod tests {
     t!(pattern_fallback_cycles_svg,                  "pattern-fallback-cycles.svg");
     t!(xinclude_text_xml_svg,                        "xinclude-text-xml.svg");
     t!(xml_pi_without_data_svg,                      "xml-pi-without-data.svg");
+    t!(bug1234_recursive_css_svg,                    "bug1234-recursive-css.svg");
 }
