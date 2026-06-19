@@ -949,8 +949,9 @@ impl Stylesheet {
             .for_each(|rule| match rule {
                 Rule::AtRule(AtRule::Import(url)) => match url_resolver.resolve_href(&url) {
                     Ok(aurl) => {
-                        // ignore invalid imports
-                        let _ = self.load(&aurl, load_limiter.clone(), session.clone());
+                        if let Err(e) = self.load(&aurl, load_limiter.clone(), session.clone()) {
+                            rsvg_log!(session, "Could not load stylesheet from \"{}\": {}", url, e);
+                        }
                     }
 
                     Err(e) => {
