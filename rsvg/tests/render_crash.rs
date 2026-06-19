@@ -71,6 +71,8 @@ mod tests {
     t!(bug1100_fuzz_layer_nesting_depth,                "bug1100-fuzz-layer-nesting-depth.svg");
     t!(bug1115_feturbulence_overflow,                   "bug1115-feTurbulence-overflow.svg");
     t!(bug1118_fuzz_large_transform_and_recursive_use,  "bug1118-fuzz-large-transform-and-recursive-use.svg");
+    t!(bug1220_self_recursive_svg,                      "bug1220-self-recursive.svg");
+    t!(bug1220_mutually_recursive,                      "bug1220-mutually-recursive-1.svg");
     t!(femerge_color_interpolation_srgb_svg,            "feMerge-color-interpolation-srgb.svg");
     t!(filters_non_invertible_paffine_svg,              "filters-non-invertible-paffine.svg");
     t!(gradient_with_empty_bbox_svg,                    "gradient-with-empty-bbox.svg");

@@ -262,6 +262,12 @@ impl fmt::Display for AcquireError {
     }
 }
 
+/// Error returned when the depth of loaded files exceeds a limit.
+///
+/// This is returned when [`crate::document::LoadingDepthLimiter`] detects that the
+/// maximum depth of recursively loaded files exceeds [`limits::MAX_FILE_LOADING_DEPTH`].
+pub struct LoadingDepthError;
+
 /// Helper for converting `Result<O, E>` into `Result<O, ElementError>`
 ///
 /// A `ElementError` requires a `QualName` that corresponds to the attribute to which the
@@ -523,6 +529,16 @@ pub enum ImplementationLimit {
     /// nest.  This is to avoid malicious SVGs which try to have layers that are nested
     /// extremely deep, as this could cause stack exhaustion.
     MaximumLayerNestingDepthExceeded,
+
+    /// Nesting level of referenced files exceeded the maximum allowed.
+    ///
+    /// Loading or rendering a document may cause other SVG documents or files
+    /// to be loaded, and in turn those other files may request further files
+    /// on their own.  Librsvg will limit the maximum depth of nesting for
+    /// loaded files, for XInclude, referencing documents via `<image>`,
+    /// CSS includes, etc., and also to deal with files that recursively reference
+    /// themselves.
+    MaximumFileNestingDepthExceeded,
 }
 
 impl error::Error for LoadingError {}
@@ -559,6 +575,16 @@ impl From<IoError> for LoadingError {
     }
 }
 
+impl From<LoadingDepthError> for LoadingError {
+    fn from(e: LoadingDepthError) -> LoadingError {
+        match e {
+            LoadingDepthError => {
+                LoadingError::LimitExceeded(ImplementationLimit::MaximumFileNestingDepthExceeded)
+            }
+        }
+    }
+}
+
 impl fmt::Display for ImplementationLimit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
@@ -584,6 +610,12 @@ impl fmt::Display for ImplementationLimit {
                 f,
                 "maximum depth of {} nested layers has been exceeded",
                 limits::MAX_LAYER_NESTING_DEPTH,
+            ),
+
+            ImplementationLimit::MaximumFileNestingDepthExceeded => write!(
+                f,
+                "maximum depth of {} nested files exceeded when loading",
+                limits::MAX_FILE_LOADING_DEPTH,
             ),
         }
     }

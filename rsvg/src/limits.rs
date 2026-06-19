@@ -39,15 +39,15 @@ pub const MAX_LOADED_ELEMENTS: usize = 1_000_000;
 /// etc.  Librsvg puts this limit on how many attributes an element can have.
 pub const MAX_LOADED_ATTRIBUTES: usize = u16::MAX as usize;
 
-/// Maximum level of nesting for XInclude (XML Include) files.
+/// Maximum level of nesting for loaded files.
 ///
-/// See <https://gitlab.gnome.org/GNOME/librsvg/-/issues/942>.  With
-/// the use of XML like `<xi:include parse="xml" href="foo.xml"/>`, an
-/// SVG document can recursively include other XML files.  This value
-/// defines a maximum level of nesting for XInclude, to prevent cases
-/// where the base document is included within itself, or when two
-/// documents recursively include each other.
-pub const MAX_XINCLUDE_DEPTH: usize = 20;
+/// Loading or rendering a document may cause other SVG documents or files
+/// to be loaded, and in turn those other files may request further files
+/// on their own.  Librsvg will limit the maximum depth of nesting for
+/// loaded files, for XInclude, referencing documents via `<image>`,
+/// CSS includes, etc., and also to deal with files that recursively reference
+/// themselves.
+pub const MAX_FILE_LOADING_DEPTH: usize = 20;
 
 /// Maximum level of nesting for layers during rendering.
 ///

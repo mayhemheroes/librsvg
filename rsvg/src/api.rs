@@ -18,7 +18,7 @@ pub use crate::{
 use crate::{
     accept_language::UserLanguage,
     css::{Origin, Stylesheet},
-    document::{Document, LoadOptions, NodeId, RenderingOptions},
+    document::{Document, LoadOptions, LoadingDepthLimiter, NodeId, RenderingOptions},
     dpi::Dpi,
     drawing_ctx::SvgNesting,
     error::InternalRenderingError,
@@ -303,6 +303,7 @@ impl Loader {
             document: Document::load_from_stream(
                 self.session.clone(),
                 Arc::new(load_options),
+                LoadingDepthLimiter::new(),
                 stream.as_ref(),
                 cancellable.map(|c| c.as_ref()),
             )?,
@@ -358,6 +359,7 @@ impl SvgHandle {
             css,
             &UrlResolver::new(None),
             Origin::User,
+            LoadingDepthLimiter::new(),
             self.session.clone(),
         )?;
         self.document.cascade(&[stylesheet]);
