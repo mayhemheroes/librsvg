@@ -1,0 +1,5 @@
+project: librsvg
+target: svg-loader
+cmds:
+  - cmd: /mayhem/svg_loader
+    libfuzzer: true
