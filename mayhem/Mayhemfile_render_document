@@ -1,0 +1,5 @@
+project: librsvg
+target: render-document
+cmds:
+  - cmd: /mayhem/render_document
+    libfuzzer: true

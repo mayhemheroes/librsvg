@@ -1,0 +1,37 @@
+[package]
+name = "rsvg-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+# Keep this fuzz crate out of the parent (librsvg) cargo workspace so cargo-fuzz can build it in
+# isolation. The `librsvg` (lib name `rsvg`) path dependency still resolves ITS OWN workspace deps
+# from the librsvg root; we only need to pin the harness's direct deps here. Versions match the
+# librsvg workspace (gtk-rs 0.22) so cairo/glib/gio types unify with the rsvg crate.
+[workspace]
+members = ["."]
+
+[dependencies]
+cairo-rs = "0.22.0"
+glib = "0.22.0"
+gio = "0.22.0"
+libfuzzer-sys = "0.4"
+librsvg = { path = "../../rsvg" }
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "render_document"
+path = "fuzz_targets/render_document.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "svg_loader"
+path = "fuzz_targets/svg_loader.rs"
+test = false
+doc = false
