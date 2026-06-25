@@ -1,3 +1,39 @@
+Version 2.62.90
+===============
+
+librsvg crate version 2.63.0-beta.0
+
+librsvg-rebind crate version 0.3.0
+
+- #1220 and #1224 - Limit the depth of files that reference other
+  files, via XML XInclude, inter-document references, and CSS
+  includes.  The Rust API has a new
+  ImplementationLimit::MaximumFileNestingDepthExceeded error variant
+  to surface this to the loading functions.
+
+- #1142: Fix blurry embeded SVG images by rasterizing them at 
+  device resolution (Dylan Sechet).
+
+- #1093 - Remove loading limits from image-rs.  This means that raster
+  images, when embedded in SVG documents, have no limits for their
+  size or memory consumption.  The idea, for now, is that
+  security-sensitive applications that use librsvg should do their own
+  sandboxing if they want to impose memory limits.
+
+- #1229: Fix build when gobject-introspection is enabled but
+  gdk-pixbuf is disabled.
+
+- Fix the logic for whether gdk-pixbuf-query-loaders should be run
+  during cross-compilation.  Native builds can of course use it; cross
+  builds can use it if they can run host binaries *and* an executable
+  wrapper has been set *and* the target sysroot contains the
+  corresponding gdk-pixbuf-query-loaders executable (Ross Burton).
+
+- #1231 - Document the crate's feature flags.
+
+- Update the Rust dependencies.
+
+
 Version 2.62.1
 ==============
 
